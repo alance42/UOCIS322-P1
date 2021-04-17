@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 import socket    # Basic TCP/IP communication on the internet
 import _thread   # Response computation runs concurrently with main program
+import os
 
 
 def listen(portnum):
@@ -88,11 +89,30 @@ def respond(sock):
     request = str(request, encoding='utf-8', errors='strict')
     log.info("--- Received request ----")
     log.info("Request was {}\n***\n".format(request))
+    forbiddenChar = ["..", "//", "~"]
+
+    
+
+    pages = os.path.join( os.path.dirname( __file__ ), '../' + get_options().DOCROOT)
+    pagelist = os.listdir(pages)
 
     parts = request.split()
-    if len(parts) > 1 and parts[0] == "GET":
+    print(parts[1])
+    log.info(parts)
+    if parts[1] == "/" and parts[0] == "GET":
         transmit(STATUS_OK, sock)
         transmit(CAT, sock)
+    elif any(ele in parts[1] for ele in forbiddenChar):
+        transmit(STATUS_FORBIDDEN, sock)
+        transmit("403 Forbidden", sock)
+    elif not parts[1][1:] in pagelist:
+        transmit(STATUS_NOT_FOUND, sock)
+        transmit("404 Not Found", sock)
+    elif parts[1][1:] in pagelist:
+        #[1:] ignores the first character aka the / in /page.html
+        with open(os.path.join(pages, parts[1][1:])) as file:
+            transmit(STATUS_OK, sock)
+            transmit(file.read(), sock)
     else:
         log.info("Unhandled request: {}".format(request))
         transmit(STATUS_NOT_IMPLEMENTED, sock)
